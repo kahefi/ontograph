@@ -1,4 +1,7 @@
 # ontograph
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/kahefi/ontograph/blob/main/LICENSE)
+
 A Go package that contains utilities to work with RDF ontology graphs on different graph storages.
 
 ## Installation
