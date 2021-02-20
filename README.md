@@ -23,9 +23,9 @@ TODO
 TODO
 
 ## Linting & Testing
-Check package for sanity by running the Ginkgo BDD test suites:
+Check package for sanity by running the Ginkgo BDD test suite for the package:
 ```bash
-go test -cover
+go test -cover -coverprofile=./cover.out && go tool cover -func=./cover.out
 ```
 Also make sure that code linting is passed by fixing the issues indicated with the linters:
 ```bash
