@@ -49,7 +49,7 @@ var _ = Describe("MemoryStore", func() {
 
 	Describe("Retrieving the graph URI", func() {
 		It("should match the initialisation", func() {
-			Expect(graph.GetUri()).To(Equal(graphUri))
+			Expect(graph.GetURI()).To(Equal(graphUri))
 		})
 	})
 
@@ -356,7 +356,7 @@ var _ = Describe("MemoryStore", func() {
 	Describe("Droping the graph store", func() {
 		It("should render the store unusable", func() {
 			_ = graph.Drop()
-			Expect(graph.GetUri()).To(BeEmpty())
+			Expect(graph.GetURI()).To(BeEmpty())
 		})
 	})
 

@@ -8,7 +8,7 @@ import (
 // GraphStore provides methods to create, read, update and delete RDF triples for graphs.
 type GraphStore interface {
 	// GetUri should return the named graph URI.
-	GetUri() string
+	GetURI() string
 
 	// GetFirstMatch should retrieve the first triple that matches the pattern. Empty strings in subject, predicate or object should be treated as wildcards.
 	GetFirstMatch(subj, pred, obj string) (Triple, error)

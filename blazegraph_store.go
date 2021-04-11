@@ -16,22 +16,9 @@ type BlazegraphStore struct {
 	endpoint  *BlazegraphEndpoint
 }
 
-// GetUri returns the named graph URI.
-func (store *BlazegraphStore) GetUri() string {
+// GetURI returns the named graph URI.
+func (store *BlazegraphStore) GetURI() string {
 	return store.uri
-}
-
-func binding2Term(binding JSONResultSetBinding) Term {
-	switch binding.Type {
-	case "uri":
-		return NewResourceTerm(binding.Value)
-	case "literal":
-		return NewLiteralTerm(binding.Value, binding.Lang, binding.DataType)
-	case "typed-literal":
-		return NewLiteralTerm(binding.Value, binding.Lang, binding.DataType)
-	default:
-		panic(fmt.Sprintf("Unknown JSON Result Set binding type '%s'", binding.Type))
-	}
 }
 
 // GetFirstMatch retrieves the first triple that matches the pattern. Empty strings in subject, predicate or object are treated as wildcards.
@@ -367,19 +354,19 @@ func (store *BlazegraphStore) SerializeToTurtle(w io.Writer, pretty bool) error 
 		"xsd":  "http://www.w3.org/2001/XMLSchema#",
 	}
 	// Find all imports
-	const OWL_IMPORTS string = "http://www.w3.org/2002/07/owl#imports"
-	trps, err := store.GetAllMatches(NewResourceTerm(store.uri).String(), NewResourceTerm(OWL_IMPORTS).String(), "")
+	const OWLImports string = "http://www.w3.org/2002/07/owl#imports"
+	trps, err := store.GetAllMatches(NewResourceTerm(store.uri).String(), NewResourceTerm(OWLImports).String(), "")
 	if err != nil {
 		return err
 	}
-	importUris := []string{}
+	importURIs := []string{}
 	for _, trp := range trps {
-		importUris = append(importUris, trp.Object.Value())
+		importURIs = append(importURIs, trp.Object.Value())
 	}
 	// Add imports to prefix map
-	for _, importUri := range importUris {
-		abbr := importUri[strings.LastIndex(importUri, "/")+1:]
-		prefixMap[abbr] = importUri + "#"
+	for _, importURI := range importURIs {
+		abbr := importURI[strings.LastIndex(importURI, "/")+1:]
+		prefixMap[abbr] = importURI + "#"
 	}
 
 	// Convert TTL to string
@@ -442,4 +429,17 @@ func (store *BlazegraphStore) tripleExists(trp Triple) (bool, error) {
 		return false, fmt.Errorf("Failed to execute ASK query on namespace '%s' (HTTP %d)", store.namespace, code)
 	}
 	return resSet.Boolean, nil
+}
+
+func binding2Term(binding JSONResultSetBinding) Term {
+	switch binding.Type {
+	case "uri":
+		return NewResourceTerm(binding.Value)
+	case "literal":
+		return NewLiteralTerm(binding.Value, binding.Lang, binding.DataType)
+	case "typed-literal":
+		return NewLiteralTerm(binding.Value, binding.Lang, binding.DataType)
+	default:
+		panic(fmt.Sprintf("Unknown JSON Result Set binding type '%s'", binding.Type))
+	}
 }

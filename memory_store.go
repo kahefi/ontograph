@@ -37,9 +37,9 @@ func ParseFromTurtle(reader io.Reader) (*MemoryStore, error) {
 		return nil, err
 	}
 	// Find base URI
-	const RDF_TYPE string = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
-	const OWL_ONTOLOGY string = "http://www.w3.org/2002/07/owl#Ontology"
-	triple := g.One(nil, rdf2go.NewResource(RDF_TYPE), rdf2go.NewResource(OWL_ONTOLOGY))
+	const RDFType string = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
+	const OWLOntology string = "http://www.w3.org/2002/07/owl#Ontology"
+	triple := g.One(nil, rdf2go.NewResource(RDFType), rdf2go.NewResource(OWLOntology))
 	if triple == nil {
 		// Use prefix from first triple as URI
 		triple = <-g.IterTriples()
@@ -59,8 +59,8 @@ func ParseFromTurtle(reader io.Reader) (*MemoryStore, error) {
 	return &store, nil
 }
 
-// GetUri returns the named graph URI.
-func (store *MemoryStore) GetUri() string {
+// GetURI returns the named graph URI.
+func (store *MemoryStore) GetURI() string {
 	return store.uri
 }
 
@@ -254,19 +254,19 @@ func (store *MemoryStore) SerializeToTurtle(w io.Writer, pretty bool) error {
 		"xsd":  "http://www.w3.org/2001/XMLSchema#",
 	}
 	// Find all imports
-	const OWL_IMPORTS string = "http://www.w3.org/2002/07/owl#imports"
-	trps, err := store.GetAllMatches(NewResourceTerm(store.uri).String(), NewResourceTerm(OWL_IMPORTS).String(), "")
+	const OWLImports string = "http://www.w3.org/2002/07/owl#imports"
+	trps, err := store.GetAllMatches(NewResourceTerm(store.uri).String(), NewResourceTerm(OWLImports).String(), "")
 	if err != nil {
 		return err
 	}
-	importUris := []string{}
+	importURIs := []string{}
 	for _, trp := range trps {
-		importUris = append(importUris, trp.Object.Value())
+		importURIs = append(importURIs, trp.Object.Value())
 	}
 	// Add imports to prefix map
-	for _, importUri := range importUris {
-		abbr := importUri[strings.LastIndex(importUri, "/")+1:]
-		prefixMap[abbr] = importUri + "#"
+	for _, importURI := range importURIs {
+		abbr := importURI[strings.LastIndex(importURI, "/")+1:]
+		prefixMap[abbr] = importURI + "#"
 	}
 
 	// Serialize ontology into buffer
