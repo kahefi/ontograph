@@ -200,7 +200,7 @@ func (store *MemoryStore) DeleteTriples(trps []Triple) error {
 		if err != nil {
 			break
 		}
-		// Otherwise, remember added triple
+		// Otherwise, remember deleted triple
 		deletedTrps = append(deletedTrps, trp)
 	}
 	// If there was an error, revoke the deletion and return

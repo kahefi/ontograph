@@ -30,4 +30,4 @@ go test -cover -coverprofile=./cover.out && go tool cover -func=./cover.out
 Also make sure that code linting is passed by fixing the issues indicated with the linters:
 ```bash
 golangci-lint run && goreportcard-cli -v
-``` 
+```

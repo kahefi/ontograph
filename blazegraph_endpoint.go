@@ -3,7 +3,6 @@ package ontograph
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -17,6 +16,7 @@ type BlazegraphEndpoint struct {
 	client *http.Client
 }
 
+// NewBlazegraphEndpoint creates a new endpoint on the specified host address of the Blazegraph database.
 func NewBlazegraphEndpoint(hostAddr string) *BlazegraphEndpoint {
 	ep := BlazegraphEndpoint{
 		host:   hostAddr,
@@ -29,18 +29,19 @@ func NewBlazegraphEndpoint(hostAddr string) *BlazegraphEndpoint {
 func (ep *BlazegraphEndpoint) NewBlazegraphStore(uri, namespace string) *BlazegraphStore {
 	store := BlazegraphStore{
 		uri:       uri,
-		namepsace: namespace,
+		namespace: namespace,
 		endpoint:  ep,
 	}
 	return &store
 }
 
+// IsOnline checks if the Blazegraph endpoint is online (i.e. if it responds with HTTP 200 on its status endpoint).
 func (ep *BlazegraphEndpoint) IsOnline() (bool, error) {
 	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/bigdata/status", ep.host), nil)
 	if err != nil {
 		return false, err
 	}
-	code, _, err := ep.doHttp(req)
+	code, _, err := ep.doHTTP(req)
 	if err != nil {
 		return false, err
 	}
@@ -60,7 +61,7 @@ func (ep *BlazegraphEndpoint) GetNamespaces() ([]string, error) {
 	}
 
 	// Execute request
-	statusCode, data, err := ep.doHttp(req)
+	statusCode, data, err := ep.doHTTP(req)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +105,7 @@ func (ep *BlazegraphEndpoint) CreateNamespace(id string) error {
 	req.Header.Set("Content-Type", "text/plain")
 
 	// Execute request
-	statusCode, _, err := ep.doHttp(req)
+	statusCode, _, err := ep.doHTTP(req)
 	if err != nil {
 		return err
 	}
@@ -125,7 +126,7 @@ func (ep *BlazegraphEndpoint) DropNamespace(id string) error {
 	}
 
 	// Execute request
-	statusCode, _, err := ep.doHttp(req)
+	statusCode, _, err := ep.doHTTP(req)
 	if err != nil {
 		return err
 	}
@@ -153,35 +154,10 @@ func (ep *BlazegraphEndpoint) NamespaceExists(id string) (bool, error) {
 	return false, nil
 }
 
-// InsertTurtleData inserts data in Turtle (ttl) format into the database.
-func (ep *BlazegraphEndpoint) InsertTurtleData(namespace, uri string, ttlData io.Reader) error {
-	// Convert reader to buffer
-	ttlDataBuffer := new(strings.Builder)
-	_, err := io.Copy(ttlDataBuffer, ttlData)
-	if err != nil {
-		return err
-	}
-	// Compile SPARQL request
-	sparqlReq := fmt.Sprintf("INSERT DATA { GRAPH <%s> { %s } }", uri, ttlDataBuffer.String())
-	code, err := ep.DoSparqlUpdate(namespace, sparqlReq)
-	// Check response status
-	if err != nil {
-		return err
-	}
-	if code == http.StatusNotFound {
-		return fmt.Errorf("Namespace '%s' does not exist (HTTP %d)", namespace, http.StatusNotFound)
-	}
-	if code != http.StatusOK {
-		return fmt.Errorf("Failed to insert turtle data into ontology '%s' on namespace '%s' (HTTP %d)", namespace, uri, code)
-	}
-	return nil
-}
-
 // DoSparqlTurtleQuery queries the database for data in Turtle (ttl) format.
 func (ep *BlazegraphEndpoint) DoSparqlTurtleQuery(namespace, sparqlQuery string) ([]byte, int, error) {
 	// Setup request payload
-	encQuery := fmt.Sprintf("query=%s" + url.QueryEscape(sparqlQuery))
-
+	encQuery := fmt.Sprintf("query=%s", url.QueryEscape(sparqlQuery))
 	// Create request
 	path := fmt.Sprintf("%s/bigdata/namespace/%s/sparql", ep.host, url.PathEscape(namespace))
 	req, err := http.NewRequest(http.MethodPost, path, strings.NewReader(encQuery))
@@ -192,16 +168,16 @@ func (ep *BlazegraphEndpoint) DoSparqlTurtleQuery(namespace, sparqlQuery string)
 	req.Header.Set("Accept", "application/x-turtle")
 
 	// Execute request
-	code, data, err := ep.doHttp(req)
+	code, data, err := ep.doHTTP(req)
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}
 	return data, code, nil
 }
 
-// DoSparqlJsonQuery queries the database for data in JSON Result Set format.
-func (ep *BlazegraphEndpoint) DoSparqlJsonQuery(namespace, sparqlQuery string) (JsonResultSet, int, error) {
-	var resSet JsonResultSet
+// DoSparqlJSONQuery queries the database for data in JSON Result Set format.
+func (ep *BlazegraphEndpoint) DoSparqlJSONQuery(namespace, sparqlQuery string) (JSONResultSet, int, error) {
+	var resSet JSONResultSet
 	// Setup request payload
 	encQuery := fmt.Sprintf("query=%s", url.QueryEscape(sparqlQuery))
 
@@ -215,7 +191,7 @@ func (ep *BlazegraphEndpoint) DoSparqlJsonQuery(namespace, sparqlQuery string) (
 	req.Header.Set("Accept", "application/sparql-results+json")
 
 	// Execute request
-	code, data, err := ep.doHttp(req)
+	code, data, err := ep.doHTTP(req)
 	if err != nil {
 		return resSet, http.StatusInternalServerError, err
 	}
@@ -241,7 +217,7 @@ func (ep *BlazegraphEndpoint) DoSparqlUpdate(namespace, sparqlUpdate string) (in
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
 
 	// Execute request
-	code, _, err := ep.doHttp(req)
+	code, _, err := ep.doHTTP(req)
 	if err != nil {
 		return http.StatusInternalServerError, err
 	}
@@ -249,11 +225,11 @@ func (ep *BlazegraphEndpoint) DoSparqlUpdate(namespace, sparqlUpdate string) (in
 	return code, nil
 }
 
-// doHttp executes the given request and returns HTTP status code, result data and error.
+// doHTTP executes the given request and returns HTTP status code, result data and error.
 // In case that the returned status code is -1, there was an error with the request itself.
 // If the status code is a valid HTTP code and error is not nil, there was an error with
 // decoding the response body.
-func (ep *BlazegraphEndpoint) doHttp(req *http.Request) (int, []byte, error) {
+func (ep *BlazegraphEndpoint) doHTTP(req *http.Request) (int, []byte, error) {
 	res, err := ep.client.Do(req)
 	if err != nil {
 		return -1, nil, err
@@ -267,20 +243,24 @@ func (ep *BlazegraphEndpoint) doHttp(req *http.Request) (int, []byte, error) {
 	return res.StatusCode, data, nil
 }
 
-type JsonResultSet struct {
+// A JSONResultSet represents the result set for SPARQL queries in JSON format (see https://www.w3.org/TR/sparql11-results-json for details)
+type JSONResultSet struct {
 	Head struct {
 		Link []string `json:"link,omitempty"`
 		Vars []string `json:"vars,omitempty"`
 	} `json:"head,omitempty"`
 	Results struct {
-		Distinct bool `json:"distinct,omitempty"` // Deprecated
-		Ordered  bool `json:"ordered,omitempty"`  // Deprecated
-		Bindings []map[string]struct {
-			Type     string `json:"type,omitempty"` // "uri", "literal", "typed-literal" or "bnode"
-			Value    string `json:"value,omitempty"`
-			Lang     string `json:"xml:lang,omitempty"`
-			DataType string `json:"datatype,omitempty"`
-		} `json:"bindings,omitempty"`
+		Distinct bool                              `json:"distinct,omitempty"` // Deprecated
+		Ordered  bool                              `json:"ordered,omitempty"`  // Deprecated
+		Bindings []map[string]JSONResultSetBinding `json:"bindings,omitempty"`
 	} `json:"results,omitempty"`
 	Boolean bool `json:"boolean,omitempty"`
+}
+
+// A JSONResultSetBinding represents a binding results from the JSONResultSet.Results.Bindings slice.
+type JSONResultSetBinding struct {
+	Type     string `json:"type,omitempty"` // "uri", "literal", "typed-literal" or "bnode"
+	Value    string `json:"value,omitempty"`
+	Lang     string `json:"xml:lang,omitempty"`
+	DataType string `json:"datatype,omitempty"`
 }
