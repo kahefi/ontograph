@@ -11,7 +11,7 @@ type GraphStore interface {
 	GetURI() string
 
 	// GetFirstMatch should retrieve the first triple that matches the pattern. Empty strings in subject, predicate or object should be treated as wildcards.
-	GetFirstMatch(subj, pred, obj string) (Triple, error)
+	GetFirstMatch(subj, pred, obj string) (*Triple, error)
 	// GetAllMatches should retrieve all triples that match the pattern. Empty strings in subject, predicate or object should be treated as wildcards.
 	GetAllMatches(subj, pred, obj string) ([]Triple, error)
 
