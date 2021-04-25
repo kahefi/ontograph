@@ -73,14 +73,78 @@ dbGraph.AddTriplesUnchecked([]Triple{trp1, trp2})
 ```
 
 ### Ontology Graphs
-TODO
+Ontology graphs leverage graph stores (which only process triples) to RDF/RDFS/OWL Ontologies. Instead of working with raw triples, you can use the basic concepts for web semantics directly:
+* Classes
+* Object Properties
+* Data Properties
+* Individuals
+The concepts of the OWL standard can be read up [here](https://www.w3.org/TR/owl2-syntax).
+
+```golang
+// Initialize a new in-memory graph store
+graphUri := "https://example.com"
+memGraph := ontograph.NewMemoryStore(graphUri)
+
+// Create ontology graph with graph store backend
+ont := ontograph.NewOntologyGraph(memGraph)
+
+// How to create a new class and adding it to the ontology:
+myClass := ontograph.OntologyClass{
+    URI:   "https://example.com#my-class",
+    Label: map[string]string{"en": "My Class", "de": "Meine Klasse"},
+}
+ont.UpsertResource(&myClass)
+
+// How to create a new object property and adding it to the ontology:
+myRel := ontograph.OntologyObjectProperty{
+    URI:         "https://example.com#my-relation",
+    Domains:     []string{myClass.URI},
+    Ranges:      []string{myClass.URI},
+    IsReflexive: true,
+}
+ont.UpsertResource(&myRel)
+
+// How to create a new individual and adding it to the ontology:
+myIndiv := ontograph.OntologyIndividual{
+    URI:     "https://example.com#my-indiv",
+    Types:   []string{myClass.URI},
+    Label:   map[string]string{"": "My Individual"},
+    Comment: map[string]string{"": "some comment", "de": "ein kommentar"},
+}
+ont.UpsertResource(&myIndiv)
+
+// How to add relations and data properties to the individual
+myIndiv.AddObjectProperty(myRel.URI, myIndiv.URI)
+myIndiv.AddDataProperty("http://abc.com#dataprop1", ontograph.XSDStringLiteral("Some string literal").Generic())
+myIndiv.AddDataProperty("http://abc.com#dataprop2", ontograph.XSDIntegerLiteral(42).Generic())
+ont.UpsertResource(&myIndiv)
+
+// How to retrieve an individual
+indiv, _ := ont.GetIndividual("https://example.com#my-indiv")
+fmt.Println(fmt.Sprintf("%+v", indiv))
+
+// How to print all values of a data property in an individual
+for _, dp := range indiv.DataProperties["http://abc.com#dataprop2"] {
+    val, _ := dp.ToXSDInteger()
+    fmt.Println(int(val))
+}
+```
 
 ## Linting & Testing
-Check for sanity by running the Ginkgo BDD test suite for the package:
+In order to run all tests, databases for testing purposes must be up and running. The easiest way to do this is by running the preconfigured docker-compose:
+```bash
+docker-compose -f docker-compose.test.yml up -d
+```
+
+After everything is up and running, the Ginkgo BDD test suite for the package can be run:
 ```bash
 go test -cover -coverprofile=./cover.out && go tool cover -func=./cover.out
 ```
+
 Also make sure that code linting is passed by fixing the issues indicated with the linters:
 ```bash
 golangci-lint run && goreportcard-cli -v
 ```
+
+# To-Dos
+* Add tests for ontology_literal.go
