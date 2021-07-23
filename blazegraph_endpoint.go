@@ -154,6 +154,24 @@ func (ep *BlazegraphEndpoint) NamespaceExists(id string) (bool, error) {
 	return false, nil
 }
 
+// GetGraphs retrieves a list of graphs within the namespace of the database.
+func (ep *BlazegraphEndpoint) GetGraphs(namespace string) ([]string, error) {
+	sparqlReq := fmt.Sprintf(`SELECT DISTINCT ?g WHERE { GRAPH ?g { ?s ?p ?o } }`)
+	resSet, code, err := ep.DoSparqlJSONQuery(namespace, sparqlReq)
+	if err != nil {
+		return []string{}, err
+	}
+	if code != http.StatusOK {
+		return []string{}, fmt.Errorf("Unexpected response when retrieving graphs (HTTP %d)", code)
+	}
+	// Retrieve graph URIs from result set
+	graphUris := []string{}
+	for _, binding := range resSet.Results.Bindings {
+		graphUris = append(graphUris, binding["g"].Value)
+	}
+	return graphUris, nil
+}
+
 // DoSparqlTurtleQuery queries the database for data in Turtle (ttl) format.
 func (ep *BlazegraphEndpoint) DoSparqlTurtleQuery(namespace, sparqlQuery string) ([]byte, int, error) {
 	// Setup request payload

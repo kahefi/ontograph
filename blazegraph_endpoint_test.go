@@ -145,6 +145,34 @@ var _ = Describe("BlazegraphEndpoint", func() {
 		})
 	})
 
+	Describe("Retrieving a list of graph URIs in a namespace", func() {
+		var testGraphs []string
+		var testNs string
+		BeforeEach(func() {
+			testNs = fmt.Sprintf("ns-%s", shortid.MustGenerate())
+			err := endpoint.CreateNamespace(testNs)
+			Expect(err).NotTo(HaveOccurred())
+			for range []int{0, 1, 2, 3, 4, 5} {
+				// Init new ontology for the graph
+				testGraph := fmt.Sprintf("http://test.com/graph-%s", shortid.MustGenerate())
+				_, err = InitOntologyGraph(endpoint.NewBlazegraphStore(testGraph, testNs))
+				Expect(err).NotTo(HaveOccurred())
+				// Register graph for testing later
+				testGraphs = append(testGraphs, testGraph)
+			}
+		})
+		AfterEach(func() {
+			_ = endpoint.DropNamespace(testNs)
+		})
+		It("should return a list containing the expected graph URIs", func() {
+			graphList, err := endpoint.GetGraphs(testNs)
+			By("not returning an error")
+			Expect(err).NotTo(HaveOccurred())
+			By("Containing each of the expected namespaces")
+			Expect(graphList).To(ContainElements(testGraphs))
+		})
+	})
+
 	// DoSparqlTurtleQuery covered by BlazegraphStore tests
 
 	// DoSparqlJsonQuery covered by BlazegraphStore tests
