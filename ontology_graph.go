@@ -7,15 +7,95 @@ import (
 
 // An OntologyGraph represents an ontology backed by a grapg store using a higher abstraction level.
 type OntologyGraph struct {
-	graph GraphStore
+	graph   GraphStore
+	label   map[string]string
+	comment map[string]string
 }
 
-// NewOntologyGraph creates a new ontology using the given graph store as backend.
-func NewOntologyGraph(graph GraphStore) *OntologyGraph {
-	ont := OntologyGraph{
-		graph: graph,
+// InitOntologyGraph initializes a new ontology on the given graph store as backend and adds
+// the appropriate definition triples to the store.
+// This constructor only works when the ontology definitions do not exist (use LoadOntologyGraph
+// otherwise).
+func InitOntologyGraph(graph GraphStore) (*OntologyGraph, error) {
+	// Check if ontology already exists
+	trp, err := graph.GetFirstMatch(
+		NewResourceTerm(graph.GetURI()).String(),
+		NewResourceTerm(RDFType).String(),
+		NewResourceTerm(OWLOntology).String(),
+	)
+	if err != nil {
+		return nil, err
 	}
-	return &ont
+	if trp != nil {
+		return nil, ErrOntologyAlreadyExists
+	}
+	// Add ontology definition triples
+	err = graph.AddTripleUnchecked(Triple{
+		Subject:   NewResourceTerm(graph.GetURI()),
+		Predicate: NewResourceTerm(RDFType),
+		Object:    NewResourceTerm(OWLOntology),
+	})
+	if err != nil {
+		return nil, err
+	}
+	// Success
+	ont := OntologyGraph{
+		graph:   graph,
+		label:   map[string]string{},
+		comment: map[string]string{},
+	}
+	return &ont, nil
+}
+
+// LoadOntologyGraph loads the ontology using the given graph store as backend.
+// This constructor only works when the ontology definitions already exist (use InitOntologyGraph
+// otherwise to create them).
+func LoadOntologyGraph(graph GraphStore) (*OntologyGraph, error) {
+	// Check if ontology does exists
+	trp, err := graph.GetFirstMatch(
+		NewResourceTerm(graph.GetURI()).String(),
+		NewResourceTerm(RDFType).String(),
+		NewResourceTerm(OWLOntology).String(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	if trp == nil {
+		return nil, ErrOntologyNotFound
+	}
+	// Success
+	ont := OntologyGraph{
+		graph:   graph,
+		label:   map[string]string{},
+		comment: map[string]string{},
+	}
+
+	// Retrieve labels (if available)
+	trps, err := ont.graph.GetAllMatches(
+		NewResourceTerm(ont.GetURI()).String(),
+		NewResourceTerm(RDFSLabel).String(),
+		"",
+	)
+	if err != nil {
+		return nil, err
+	}
+	for _, trp := range trps {
+		ont.label[trp.Object.Language()] = trp.Object.Value()
+	}
+	// Retrieve comments (if available)
+	trps, err = ont.graph.GetAllMatches(
+		NewResourceTerm(ont.GetURI()).String(),
+		NewResourceTerm(RDFSComment).String(),
+		"",
+	)
+	if err != nil {
+		return nil, err
+	}
+	for _, trp := range trps {
+		ont.comment[trp.Object.Language()] = trp.Object.Value()
+	}
+
+	return &ont, nil
 }
 
 // GetURI returns the URI of the ontology
@@ -87,6 +167,78 @@ func (ont *OntologyGraph) AddImport(uri string) error {
 		Predicate: NewResourceTerm(OWLImports),
 		Object:    NewResourceTerm(uri),
 	})
+}
+
+// SetLabel sets the ontology label for the specified language code.
+// Any previous set label for the language will be removed.
+// If `label` is empty, the label for the language code will be removed.
+func (ont *OntologyGraph) SetLabel(label, lang string) error {
+	// Check if previous label must be removed
+	if val, ok := ont.label[lang]; ok {
+		if err := ont.graph.DeleteTripleUnchecked(Triple{
+			Subject:   NewResourceTerm(ont.GetURI()),
+			Predicate: NewResourceTerm(RDFSLabel),
+			Object:    NewLiteralTerm(val, lang, ""),
+		}); err != nil {
+			return err
+		}
+	}
+	// We are done if a label is to be removed
+	if label == "" {
+		return nil
+	}
+	// We can add the new label triple
+	if err := ont.graph.AddTripleUnchecked(Triple{
+		Subject:   NewResourceTerm(ont.GetURI()),
+		Predicate: NewResourceTerm(RDFSLabel),
+		Object:    NewLiteralTerm(label, lang, ""),
+	}); err != nil {
+		return err
+	}
+	// Sync the local label map
+	ont.label[lang] = label
+	return nil
+}
+
+// GetLabel retrieves the ontology label for the specified language code.
+func (ont *OntologyGraph) GetLabel(lang string) string {
+	return ont.label[lang]
+}
+
+// SetComment sets the ontology comment for the specified language code.
+// Any previous set comment for the language will be removed.
+// If `comment` is empty, the comment for the language code will be removed.
+func (ont *OntologyGraph) SetComment(comment, lang string) error {
+	// Check if previous comment must be removed
+	if val, ok := ont.comment[lang]; ok {
+		if err := ont.graph.DeleteTripleUnchecked(Triple{
+			Subject:   NewResourceTerm(ont.GetURI()),
+			Predicate: NewResourceTerm(RDFSComment),
+			Object:    NewLiteralTerm(val, lang, ""),
+		}); err != nil {
+			return err
+		}
+	}
+	// We are done if a comment is to be removed
+	if comment == "" {
+		return nil
+	}
+	// We can add the new comment triple
+	if err := ont.graph.AddTripleUnchecked(Triple{
+		Subject:   NewResourceTerm(ont.GetURI()),
+		Predicate: NewResourceTerm(RDFSComment),
+		Object:    NewLiteralTerm(comment, lang, ""),
+	}); err != nil {
+		return err
+	}
+	// Sync the local comment map
+	ont.comment[lang] = comment
+	return nil
+}
+
+// GetComment retrieves the ontology comment for the specified language code.
+func (ont *OntologyGraph) GetComment(lang string) string {
+	return ont.comment[lang]
 }
 
 // // AddClass adds the given class to the ontology.
@@ -364,6 +516,12 @@ func (ont *OntologyGraph) GetIndividual(uri string) (OntologyIndividual, error) 
 // *****************
 // * Shared Errors *
 // *****************
+
+// ErrOntologyNotFound is raised when an ontology does not exist.
+var ErrOntologyNotFound error = errors.New("The requested ontology does not exist")
+
+// ErrOntologyAlreadyExists is raised when an ontology already exists.
+var ErrOntologyAlreadyExists error = errors.New("The requested ontology already exists")
 
 // ErrResourceNotFound is raised on conflict errors when a triple already exists (i.e. adding triples).
 var ErrResourceNotFound error = errors.New("The requested ontology resource does not exist in the graph")

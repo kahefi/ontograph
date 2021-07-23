@@ -12,20 +12,73 @@ import (
 
 var _ = Describe("OntologyGraph", func() {
     var testUri string
+    var graph GraphStore
     var ont *OntologyGraph
 
     BeforeEach(func() {
+        // Setup ontology
         testUri = fmt.Sprintf("https://www.ontograph.com/test-%s", shortuuid.New())
-        graph := NewMemoryStore(testUri)
-        ont = NewOntologyGraph(graph)
+        graph = NewMemoryStore(testUri)
+        var err error
+        ont, err = InitOntologyGraph(graph)
+        Expect(err).NotTo(HaveOccurred())
     })
 
     AfterEach(func() {
     })
 
-    Describe("Retrieving the ontology URI", func() {
+    Describe("Loading the ontology graph", func() {
         It("should match the initialisation", func() {
+            ont, err := LoadOntologyGraph(graph)
+            Expect(err).NotTo(HaveOccurred())
             Expect(ont.GetURI()).To(Equal(testUri))
+        })
+    })
+
+    Describe("Setting ontology labels and comments", func() {
+        It("should have added the expected labels", func() {
+            err := ont.SetLabel("label", "en")
+            Expect(err).NotTo(HaveOccurred())
+            err = ont.SetLabel("should not appear", "de")
+            Expect(err).NotTo(HaveOccurred())
+            err = ont.SetLabel("titel", "de")
+            Expect(err).NotTo(HaveOccurred())
+            err = ont.SetLabel("42", "")
+            Expect(err).NotTo(HaveOccurred())
+            // Check that labels were set correctly
+            Expect(ont.GetLabel("de")).To(Equal("titel"))
+            Expect(ont.GetLabel("en")).To(Equal("label"))
+            Expect(ont.GetLabel("")).To(Equal("42"))
+
+            // Reload ontology and check labels again to make sure they were stored correctly
+            ont, err = LoadOntologyGraph(graph)
+            Expect(err).NotTo(HaveOccurred())
+            Expect(ont.GetURI()).To(Equal(testUri))
+            Expect(ont.GetLabel("de")).To(Equal("titel"))
+            Expect(ont.GetLabel("en")).To(Equal("label"))
+            Expect(ont.GetLabel("")).To(Equal("42"))
+        })
+        It("should have added the expected comments", func() {
+            err := ont.SetComment("comment", "en")
+            Expect(err).NotTo(HaveOccurred())
+            err = ont.SetComment("should not appear", "de")
+            Expect(err).NotTo(HaveOccurred())
+            err = ont.SetComment("kommentar", "de")
+            Expect(err).NotTo(HaveOccurred())
+            err = ont.SetComment("42", "")
+            Expect(err).NotTo(HaveOccurred())
+            // Check that comments were set correctly
+            Expect(ont.GetComment("de")).To(Equal("kommentar"))
+            Expect(ont.GetComment("en")).To(Equal("comment"))
+            Expect(ont.GetComment("")).To(Equal("42"))
+
+            // Reload ontology and check comments again to make sure they were stored correctly
+            ont, err = LoadOntologyGraph(graph)
+            Expect(err).NotTo(HaveOccurred())
+            Expect(ont.GetURI()).To(Equal(testUri))
+            Expect(ont.GetComment("de")).To(Equal("kommentar"))
+            Expect(ont.GetComment("en")).To(Equal("comment"))
+            Expect(ont.GetComment("")).To(Equal("42"))
         })
     })
 
