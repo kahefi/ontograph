@@ -111,7 +111,7 @@ func (store *BlazegraphStore) DeleteAllMatches(subj, pred, obj string) error {
 		return nil
 	}
 	if code != http.StatusOK {
-		return fmt.Errorf("Failed to delete triples from graph '%s' on namespace '%s' (HTTP %d)", store.namespace, store.uri, code)
+		return fmt.Errorf("Failed to delete triples from graph '%s' on namespace '%s' (HTTP %d)", store.uri, store.namespace, code)
 	}
 	// We succeeded
 	return nil
@@ -173,7 +173,7 @@ func (store *BlazegraphStore) AddTripleUnchecked(trp Triple) error {
 		return fmt.Errorf("Namespace '%s' does not exist (HTTP %d)", store.namespace, http.StatusNotFound)
 	}
 	if code != http.StatusOK {
-		return fmt.Errorf("Failed to insert triple into graph '%s' on namespace '%s' (HTTP %d)", store.namespace, store.uri, code)
+		return fmt.Errorf("Failed to insert triple into graph '%s' on namespace '%s' (HTTP %d)", store.uri, store.namespace, code)
 	}
 	// We succeeded
 	return nil
@@ -197,7 +197,7 @@ func (store *BlazegraphStore) AddTriplesUnchecked(trps []Triple) error {
 		return fmt.Errorf("Namespace '%s' does not exist (HTTP %d)", store.namespace, http.StatusNotFound)
 	}
 	if code != http.StatusOK {
-		return fmt.Errorf("Failed to insert triples into graph '%s' on namespace '%s' (HTTP %d)", store.namespace, store.uri, code)
+		return fmt.Errorf("Failed to insert triples into graph '%s' on namespace '%s' (HTTP %d)", store.uri, store.namespace, code)
 	}
 	// We succeeded
 	return nil
@@ -255,7 +255,7 @@ func (store *BlazegraphStore) DeleteTripleUnchecked(trp Triple) error {
 		return nil
 	}
 	if code != http.StatusOK {
-		return fmt.Errorf("Failed to delete triple from graph '%s' on namespace '%s' (HTTP %d)", store.namespace, store.uri, code)
+		return fmt.Errorf("Failed to delete triple from graph '%s' on namespace '%s' (HTTP %d)", store.uri, store.namespace, code)
 	}
 	// We succeeded
 	return nil
@@ -279,7 +279,7 @@ func (store *BlazegraphStore) DeleteTriplesUnchecked(trps []Triple) error {
 		return nil
 	}
 	if code != http.StatusOK {
-		return fmt.Errorf("Failed to delete triples from graph '%s' on namespace '%s' (HTTP %d)", store.namespace, store.uri, code)
+		return fmt.Errorf("Failed to delete triples from graph '%s' on namespace '%s' (HTTP %d)", store.uri, store.namespace, code)
 	}
 	// We succeeded
 	return nil
