@@ -506,11 +506,158 @@ func (ont *OntologyGraph) GetIndividual(uri string) (OntologyIndividual, error) 
 			}
 		}
 	}
-	// If no URI was set, the requested URI is not an object property
+	// If no URI was set, the requested URI is not an individual
 	if indiv.URI == "" {
 		return OntologyIndividual{}, ErrResourceNotFound
 	}
 	return indiv, nil
+}
+
+// GetIndividuals retrieves the individuals in the ontology filtered by the given properties.
+// The filter is provided in form of a generic triple filter whose entries are combined in
+// logical OR operation. Each `GenericTripleFilter` contains the triples in logical AND operation.
+// To increase performance, sort the filters to have the most filtered individuals first
+// and the filter that filters the least individuals last.
+// TODO: Add filter parameter to GetAllMatches in order to improve performance.
+func (ont *OntologyGraph) GetIndividuals(filters GenericTripleFilter) ([]OntologyIndividual, error) {
+	candidates := []string{}
+	if filters == nil || len(filters) == 0 {
+		// Add all individuals as candidates if no filter was supplied
+		trps, err := ont.graph.GetAllMatches("", NewResourceTerm(RDFType).String(), NewResourceTerm(OWLNamedIndividual).String())
+		if err != nil {
+			return nil, err
+		}
+		for _, trp := range trps {
+			candidates = append(candidates, trp.Subject.Value())
+		}
+	} else {
+		// Apply all filter triples in OR fashion
+		for _, filterTrps := range filters {
+			// Create AND-candidate pool
+			var andCandidates []string = nil
+			for _, filterTrp := range filterTrps {
+				trps, err := ont.graph.GetAllMatches(filterTrp.Subject.String(), filterTrp.Predicate.String(), filterTrp.Object.String())
+				if err != nil {
+					return nil, err
+				}
+				// If its the first set of matches, initialize AND-candidate pool
+				if andCandidates == nil {
+					andCandidates = []string{}
+					for _, trp := range trps {
+						andCandidates = append(andCandidates, trp.Subject.Value())
+					}
+				} else {
+					// Otherwise, intersect results with the current AND-candidates
+					newCandidates := []string{}
+					for _, trp := range trps {
+						cand := trp.Subject.Value()
+						found := false
+						for _, current := range andCandidates {
+							if current == cand {
+								found = true
+								break
+							}
+						}
+						// If candidate was found in the AND-candidate pool, we can keep it
+						if found {
+							newCandidates = append(newCandidates, cand)
+						}
+					}
+					// Updated AND-candidate pool
+					andCandidates = newCandidates
+				}
+				// Shortcut AND-evaluation if the pool is empty
+				if len(andCandidates) == 0 {
+					break
+				}
+			}
+			// Add all AND-candidates to OR-list (if not already present)
+			for _, cand := range andCandidates {
+				duplicate := false
+				for _, c := range candidates {
+					if c == cand {
+						duplicate = true
+						break
+					}
+				}
+				if !duplicate {
+					candidates = append(candidates, cand)
+				}
+			}
+		}
+
+	}
+
+	// Load all individuals
+	indivs := []OntologyIndividual{}
+	for _, uri := range candidates {
+		indiv, err := ont.GetIndividual(uri)
+		if err != nil {
+			return indivs, err
+		}
+		indivs = append(indivs, indiv)
+	}
+	return indivs, nil
+}
+
+// type GenericTripleFilter struct {
+// 	Subject    []string
+// 	Predictate []string
+// 	Object     []string
+// }
+
+// GenericTripleFilter represents a triple filtering structure where the inner list filters
+// in AND fashion and the outer list in OR fashion.
+type GenericTripleFilter [][]Triple
+
+// WithClass returns a generic triple filter that returns all
+// individuals that have the given class.
+func WithClass(classURI string) GenericTripleFilter {
+	filters := GenericTripleFilter{
+		[]Triple{
+			{
+				"",
+				NewResourceTerm(RDFType),
+				NewResourceTerm(classURI),
+			},
+		},
+	}
+	return filters
+}
+
+// WithAllClasses returns a generic triple filter that returns all
+// individuals that have all of the given classes.
+func WithAllClasses(classURIs []string) GenericTripleFilter {
+	// Add class filters in AND fashion (i.e. into inner list)
+	andFilters := []Triple{}
+	for _, classURI := range classURIs {
+		andFilters = append(andFilters, Triple{
+			"",
+			NewResourceTerm(RDFType),
+			NewResourceTerm(classURI),
+		})
+	}
+	orFilters := GenericTripleFilter{andFilters}
+	return orFilters
+}
+
+// WithAnyClass returns a generic triple filter that returns all
+// individuals that have any of the given classes.
+func WithAnyClass(classURIs []string) GenericTripleFilter {
+	// Add class filters in OR fashion (i.e. into outer list)
+	orFilters := GenericTripleFilter{}
+	for _, classURI := range classURIs {
+		andFilters := []Triple{
+			{
+				"",
+				NewResourceTerm(RDFType),
+				NewResourceTerm(classURI),
+			},
+		}
+		orFilters = append(orFilters, andFilters)
+	}
+
+	return orFilters
 }
 
 // *****************

@@ -15,6 +15,29 @@ var _ = Describe("OntologyGraph", func() {
     var graph GraphStore
     var ont *OntologyGraph
 
+    checkIndividuals := func(indiv1, indiv2 OntologyIndividual) {
+        Expect(indiv1.URI).To(Equal(indiv2.URI))
+        Expect(indiv1.Types).To(ConsistOf(indiv2.Types))
+        Expect(indiv1.SameIndividualAs).To(ConsistOf(indiv2.SameIndividualAs))
+        // Check object properties
+        for uri := range indiv1.ObjectProperties {
+            Expect(indiv1.ObjectProperties[uri]).To(ConsistOf(indiv2.ObjectProperties[uri]))
+        }
+        for uri := range indiv2.ObjectProperties {
+            Expect(indiv2.ObjectProperties[uri]).To(ConsistOf(indiv1.ObjectProperties[uri]))
+        }
+        // Check data properties
+        for uri := range indiv1.DataProperties {
+            Expect(indiv1.DataProperties[uri]).To(ConsistOf(indiv2.DataProperties[uri]))
+        }
+        for uri := range indiv2.DataProperties {
+            Expect(indiv2.DataProperties[uri]).To(ConsistOf(indiv1.DataProperties[uri]))
+        }
+        // Check labels and comments
+        Expect(indiv1.Label).To(Equal(indiv2.Label))
+        Expect(indiv1.Comment).To(Equal(indiv2.Comment))
+    }
+
     BeforeEach(func() {
         // Setup ontology
         testUri = fmt.Sprintf("https://www.ontograph.com/test-%s", shortuuid.New())
@@ -397,18 +420,7 @@ var _ = Describe("OntologyGraph", func() {
                 By("having stored the expected individual")
                 retIndiv, err := ont.GetIndividual(indiv.URI)
                 Expect(err).NotTo(HaveOccurred())
-                Expect(retIndiv.URI).To(Equal(indiv.URI))
-                Expect(retIndiv.Types).To(ConsistOf(indiv.Types))
-                Expect(retIndiv.SameIndividualAs).To(ConsistOf(indiv.SameIndividualAs))
-                // Check object properties
-                Expect(retIndiv.ObjectProperties["http://abc.com#prop1"]).To(ConsistOf(indiv.ObjectProperties["http://abc.com#prop1"]))
-                Expect(retIndiv.ObjectProperties["http://abc.com#prop3"]).To(ConsistOf(indiv.ObjectProperties["http://abc.com#prop3"]))
-                // Check data properties
-                Expect(retIndiv.DataProperties["http://abc.com#dataprop1"]).To(ConsistOf(indiv.DataProperties["http://abc.com#dataprop1"]))
-                Expect(retIndiv.DataProperties["http://abc.com#dataprop2"]).To(ConsistOf(indiv.DataProperties["http://abc.com#dataprop2"]))
-                // Check labels and comments
-                Expect(retIndiv.Label).To(Equal(indiv.Label))
-                Expect(retIndiv.Comment).To(Equal(indiv.Comment))
+                checkIndividuals(retIndiv, indiv)
             })
         })
         When("the individual does not belong to the graph", func() {
@@ -422,6 +434,145 @@ var _ = Describe("OntologyGraph", func() {
                 By("not having stored the individual")
                 _, err = ont.GetIndividual(indiv.URI)
                 Expect(err).To(Equal(ErrResourceNotFound))
+            })
+        })
+    })
+
+    Describe("Retrieving ontology individuals", func() {
+        var indiv1, indiv2, indiv3, indiv4 OntologyIndividual
+        BeforeEach(func() {
+            // Setup a bunch of individuals
+            indiv1 = OntologyIndividual{
+                URI:              testUri + "#indiv1",
+                Types:            []string{"http://abc.com#type1"},
+                Label:            map[string]string{},
+                Comment:          map[string]string{},
+                SameIndividualAs: []string{},
+            }
+            indiv2 = OntologyIndividual{
+                URI:              testUri + "#indiv2",
+                Types:            []string{"http://abc.com#type2"},
+                Label:            map[string]string{},
+                Comment:          map[string]string{},
+                SameIndividualAs: []string{},
+            }
+            indiv3 = OntologyIndividual{
+                URI:              testUri + "#indiv3",
+                Types:            []string{"http://abc.com#type1", "http://abc.com#type2", "http://abc.com#type3"},
+                Label:            map[string]string{},
+                Comment:          map[string]string{},
+                SameIndividualAs: []string{},
+            }
+            indiv4 = OntologyIndividual{
+                URI:              testUri + "#indiv4",
+                Types:            []string{"http://abc.com#type2", "http://abc.com#type3"},
+                Label:            map[string]string{},
+                Comment:          map[string]string{},
+                SameIndividualAs: []string{},
+            }
+            // Add object properties
+            indiv1.AddObjectProperty("http://abc.com#prop1", "http://abc.com#indiv2")
+            indiv1.AddObjectProperty("http://abc.com#prop1", "http://abc.com#indiv3")
+            indiv2.AddObjectProperty("http://abc.com#prop2", "http://abc.com#indiv1")
+            // indiv3 does not have any object proerties
+            indiv1.AddDataProperty("http://abc.com#dataprop1", XSDStringLiteral("Some string literal").Generic())
+            indiv3.AddDataProperty("http://abc.com#dataprop2", XSDIntegerLiteral(42).Generic())
+            // Add all individuals
+            err := ont.UpsertResource(&indiv1)
+            Expect(err).NotTo(HaveOccurred())
+            err = ont.UpsertResource(&indiv2)
+            Expect(err).NotTo(HaveOccurred())
+            err = ont.UpsertResource(&indiv3)
+            Expect(err).NotTo(HaveOccurred())
+            err = ont.UpsertResource(&indiv4)
+            Expect(err).NotTo(HaveOccurred())
+        })
+
+        When("not supplying any filter", func() {
+            It("should return all individuals in the ontology", func() {
+                indivs, err := ont.GetIndividuals(nil)
+                Expect(err).NotTo(HaveOccurred())
+                found1, found2, found3, found4 := false, false, false, false
+                for _, indiv := range indivs {
+                    if indiv.URI == indiv1.URI {
+                        checkIndividuals(indiv, indiv1)
+                        found1 = true
+                    } else if indiv.URI == indiv2.URI {
+                        checkIndividuals(indiv, indiv2)
+                        found2 = true
+                    } else if indiv.URI == indiv3.URI {
+                        checkIndividuals(indiv, indiv3)
+                        found3 = true
+                    } else if indiv.URI == indiv4.URI {
+                        checkIndividuals(indiv, indiv4)
+                        found4 = true
+                    }
+                }
+                Expect(found1).To(BeTrue())
+                Expect(found2).To(BeTrue())
+                Expect(found3).To(BeTrue())
+                Expect(found4).To(BeTrue())
+            })
+        })
+        When("filtered by a single class", func() {
+            It("should return the individuals of the specified class only", func() {
+                indivs, err := ont.GetIndividuals(WithClass("http://abc.com#type1"))
+                Expect(err).NotTo(HaveOccurred())
+                Expect(len(indivs)).To(Equal(2))
+                found1, found3 := false, false
+                for _, indiv := range indivs {
+                    if indiv.URI == indiv1.URI {
+                        checkIndividuals(indiv, indiv1)
+                        found1 = true
+                    } else if indiv.URI == indiv3.URI {
+                        checkIndividuals(indiv, indiv3)
+                        found3 = true
+                    }
+                }
+                Expect(found1).To(BeTrue())
+                Expect(found3).To(BeTrue())
+            })
+        })
+        When("filtered by all given classes", func() {
+            It("should return the individuals that match all the specified classes", func() {
+                indivs, err := ont.GetIndividuals(WithAllClasses([]string{"http://abc.com#type2", "http://abc.com#type3"}))
+                Expect(err).NotTo(HaveOccurred())
+                Expect(len(indivs)).To(Equal(2))
+                found3, found4 := false, false
+                for _, indiv := range indivs {
+                    if indiv.URI == indiv3.URI {
+                        checkIndividuals(indiv, indiv3)
+                        found3 = true
+                    } else if indiv.URI == indiv4.URI {
+                        checkIndividuals(indiv, indiv4)
+                        found4 = true
+                    }
+                }
+                Expect(found3).To(BeTrue())
+                Expect(found4).To(BeTrue())
+            })
+        })
+        When("filtered by any given class", func() {
+            It("should return the individuals that match any of the specified classes", func() {
+                indivs, err := ont.GetIndividuals(WithAnyClass([]string{"http://abc.com#type1", "http://abc.com#type3"}))
+                Expect(err).NotTo(HaveOccurred())
+                Expect(len(indivs)).To(Equal(3))
+                found1, found3, found4 := false, false, false
+                for _, indiv := range indivs {
+                    if indiv.URI == indiv1.URI {
+                        checkIndividuals(indiv, indiv1)
+                        found1 = true
+                    } else if indiv.URI == indiv3.URI {
+                        checkIndividuals(indiv, indiv3)
+                        found3 = true
+                    } else if indiv.URI == indiv4.URI {
+                        checkIndividuals(indiv, indiv4)
+                        found4 = true
+                    }
+                }
+                Expect(found1).To(BeTrue())
+                Expect(found3).To(BeTrue())
+                Expect(found4).To(BeTrue())
             })
         })
     })
