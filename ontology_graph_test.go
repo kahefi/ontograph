@@ -440,6 +440,7 @@ var _ = Describe("OntologyGraph", func() {
 
     Describe("Retrieving ontology individuals", func() {
         var indiv1, indiv2, indiv3, indiv4 OntologyIndividual
+        var filter TripleFilter
         BeforeEach(func() {
             // Setup a bunch of individuals
             indiv1 = OntologyIndividual{
@@ -486,6 +487,8 @@ var _ = Describe("OntologyGraph", func() {
             Expect(err).NotTo(HaveOccurred())
             err = ont.UpsertResource(&indiv4)
             Expect(err).NotTo(HaveOccurred())
+            // Initialize filter
+            filter = TripleFilter{}
         })
 
         When("not supplying any filter", func() {
@@ -516,7 +519,8 @@ var _ = Describe("OntologyGraph", func() {
         })
         When("filtered by a single class", func() {
             It("should return the individuals of the specified class only", func() {
-                indivs, err := ont.GetIndividuals(WithClass("http://abc.com#type1"))
+                filter = filter.OrWithClass("http://abc.com#type1")
+                indivs, err := ont.GetIndividuals(filter)
                 Expect(err).NotTo(HaveOccurred())
                 Expect(len(indivs)).To(Equal(2))
                 found1, found3 := false, false
@@ -535,7 +539,9 @@ var _ = Describe("OntologyGraph", func() {
         })
         When("filtered by all given classes", func() {
             It("should return the individuals that match all the specified classes", func() {
-                indivs, err := ont.GetIndividuals(WithAllClasses([]string{"http://abc.com#type2", "http://abc.com#type3"}))
+                filter = filter.AndWithClass("http://abc.com#type2")
+                filter = filter.AndWithClass("http://abc.com#type3")
+                indivs, err := ont.GetIndividuals(filter)
                 Expect(err).NotTo(HaveOccurred())
                 Expect(len(indivs)).To(Equal(2))
                 found3, found4 := false, false
@@ -554,7 +560,9 @@ var _ = Describe("OntologyGraph", func() {
         })
         When("filtered by any given class", func() {
             It("should return the individuals that match any of the specified classes", func() {
-                indivs, err := ont.GetIndividuals(WithAnyClass([]string{"http://abc.com#type1", "http://abc.com#type3"}))
+                filter = filter.OrWithClass("http://abc.com#type1")
+                filter = filter.OrWithClass("http://abc.com#type3")
+                indivs, err := ont.GetIndividuals(filter)
                 Expect(err).NotTo(HaveOccurred())
                 Expect(len(indivs)).To(Equal(3))
                 found1, found3, found4 := false, false, false
@@ -573,6 +581,49 @@ var _ = Describe("OntologyGraph", func() {
                 Expect(found1).To(BeTrue())
                 Expect(found3).To(BeTrue())
                 Expect(found4).To(BeTrue())
+            })
+        })
+        When("filtered by an object property", func() {
+            It("should return the individuals with the specified property only", func() {
+                filter = filter.AndWithObjectProperty("http://abc.com#prop2", "http://abc.com#indiv1")
+                indivs, err := ont.GetIndividuals(filter)
+                Expect(err).NotTo(HaveOccurred())
+                Expect(len(indivs)).To(Equal(1))
+                Expect(indivs[0].URI).To(Equal(indiv2.URI))
+                checkIndividuals(indivs[0], indiv2)
+            })
+        })
+        When("filtered by a data property", func() {
+            It("should return the individuals with the specified property only", func() {
+                filter := filter.AndWithDataProperty("http://abc.com#dataprop2", XSDIntegerLiteral(42).Generic())
+                indivs, err := ont.GetIndividuals(filter)
+                Expect(err).NotTo(HaveOccurred())
+                Expect(len(indivs)).To(Equal(1))
+                Expect(indivs[0].URI).To(Equal(indiv3.URI))
+                checkIndividuals(indivs[0], indiv3)
+            })
+        })
+        When("filtered by a chain of classes and properties", func() {
+            It("should return the expected individuals only", func() {
+                filter = filter.AndWithClass("http://abc.com#type2")
+                filter = filter.AndWithObjectProperty("http://abc.com#prop2", "http://abc.com#indiv1")
+                filter = filter.OrWithClass("http://abc.com#type3")
+                filter = filter.AndWithDataProperty("http://abc.com#dataprop2", XSDIntegerLiteral(42).Generic())
+                indivs, err := ont.GetIndividuals(filter)
+                Expect(err).NotTo(HaveOccurred())
+                Expect(len(indivs)).To(Equal(2))
+                found2, found3 := false, false
+                for _, indiv := range indivs {
+                    if indiv.URI == indiv2.URI {
+                        checkIndividuals(indiv, indiv2)
+                        found2 = true
+                    } else if indiv.URI == indiv3.URI {
+                        checkIndividuals(indiv, indiv3)
+                        found3 = true
+                    }
+                }
+                Expect(found2).To(BeTrue())
+                Expect(found3).To(BeTrue())
             })
         })
     })

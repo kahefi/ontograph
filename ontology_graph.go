@@ -514,12 +514,22 @@ func (ont *OntologyGraph) GetIndividual(uri string) (OntologyIndividual, error) 
 }
 
 // GetIndividuals retrieves the individuals in the ontology filtered by the given properties.
-// The filter is provided in form of a generic triple filter whose entries are combined in
-// logical OR operation. Each `GenericTripleFilter` contains the triples in logical AND operation.
+// The filter is provided in form of a triple filter whose entries are combined in
+// logical OR operation. Each `TripleFilter` contains the triples in logical AND operation.
 // To increase performance, sort the filters to have the most filtered individuals first
 // and the filter that filters the least individuals last.
+// For convenience, filter functions can be used and chained, e.g. the code
+// `
+//  filter := TripleFilter{}
+//	filter = filter.AndWithClass("class1")
+//  filter = filter.AndWithClass("class2")
+//  filter = filter.OrWithClass("class1")
+//  filter = filter.AndWithClass("class3")
+//	indivs, err := ont.GetIndividuals(filter)
+// `
+// will retrieve all individuals that have either class1 and class2 or class1 and class3.
 // TODO: Add filter parameter to GetAllMatches in order to improve performance.
-func (ont *OntologyGraph) GetIndividuals(filters GenericTripleFilter) ([]OntologyIndividual, error) {
+func (ont *OntologyGraph) GetIndividuals(filters TripleFilter) ([]OntologyIndividual, error) {
 	candidates := []string{}
 	if filters == nil || len(filters) == 0 {
 		// Add all individuals as candidates if no filter was supplied
@@ -606,58 +616,102 @@ func (ont *OntologyGraph) GetIndividuals(filters GenericTripleFilter) ([]Ontolog
 // 	Object     []string
 // }
 
-// GenericTripleFilter represents a triple filtering structure where the inner list filters
+// TripleFilter represents a triple filtering structure where the inner list filters
 // in AND fashion and the outer list in OR fashion.
-type GenericTripleFilter [][]Triple
+type TripleFilter [][]Triple
 
-// WithClass returns a generic triple filter that returns all
-// individuals that have the given class.
-func WithClass(classURI string) GenericTripleFilter {
-	filters := GenericTripleFilter{
-		[]Triple{
-			{
-				"",
-				NewResourceTerm(RDFType),
-				NewResourceTerm(classURI),
-			},
-		},
+// OrWithClass returns a generic triple filter that returns all
+// individuals that have the given class. The class filter is appended
+// in OR-fashion to the list of filters.
+func (filter TripleFilter) OrWithClass(classURI string) TripleFilter {
+	filterTrp := Triple{
+		Subject:   "",
+		Predicate: NewResourceTerm(RDFType),
+		Object:    NewResourceTerm(classURI),
 	}
-	return filters
+	filter = append(filter, []Triple{filterTrp})
+
+	return filter
 }
 
-// WithAllClasses returns a generic triple filter that returns all
-// individuals that have all of the given classes.
-func WithAllClasses(classURIs []string) GenericTripleFilter {
-	// Add class filters in AND fashion (i.e. into inner list)
-	andFilters := []Triple{}
-	for _, classURI := range classURIs {
-		andFilters = append(andFilters, Triple{
-			"",
-			NewResourceTerm(RDFType),
-			NewResourceTerm(classURI),
-		})
+// AndWithClass returns a generic triple filter that returns all
+// individuals that have the given class. The class filter is appended
+// in AND-fashion to the last filter in the list (if there is any).
+func (filter TripleFilter) AndWithClass(classURI string) TripleFilter {
+	filterTrp := Triple{
+		Subject:   "",
+		Predicate: NewResourceTerm(RDFType),
+		Object:    NewResourceTerm(classURI),
 	}
-	orFilters := GenericTripleFilter{andFilters}
-	return orFilters
+	// Append to last OR filter in the list
+	if len(filter) == 0 {
+		filter = append(filter, []Triple{})
+	}
+	filter[len(filter)-1] = append(filter[len(filter)-1], filterTrp)
+
+	return filter
 }
 
-// WithAnyClass returns a generic triple filter that returns all
-// individuals that have any of the given classes.
-func WithAnyClass(classURIs []string) GenericTripleFilter {
-	// Add class filters in OR fashion (i.e. into outer list)
-	orFilters := GenericTripleFilter{}
-	for _, classURI := range classURIs {
-		andFilters := []Triple{
-			{
-				"",
-				NewResourceTerm(RDFType),
-				NewResourceTerm(classURI),
-			},
-		}
-		orFilters = append(orFilters, andFilters)
+// OrWithObjectProperty returns a generic triple filter that returns all
+// individuals that have the given object property. The property filter is appended
+// in OR-fashion to the list of filters.
+func (filter TripleFilter) OrWithObjectProperty(propertyURI, objectURI string) TripleFilter {
+	filterTrp := Triple{
+		Subject:   "",
+		Predicate: NewResourceTerm(propertyURI),
+		Object:    NewResourceTerm(objectURI),
 	}
+	filter = append(filter, []Triple{filterTrp})
+	return filter
+}
 
-	return orFilters
+// AndWithObjectProperty returns a generic triple filter that returns all
+// individuals that have the given object property. The property filter is appended
+// in AND-fashion to the last filter in the list (if there is any).
+func (filter TripleFilter) AndWithObjectProperty(propertyURI, objectURI string) TripleFilter {
+	filterTrp := Triple{
+		Subject:   "",
+		Predicate: NewResourceTerm(propertyURI),
+		Object:    NewResourceTerm(objectURI),
+	}
+	// Append to last OR filter in the list
+	if len(filter) == 0 {
+		filter = append(filter, []Triple{})
+	}
+	filter[len(filter)-1] = append(filter[len(filter)-1], filterTrp)
+
+	return filter
+}
+
+// OrWithDataProperty returns a generic triple filter that returns all
+// individuals that have the given data property. The property filter is appended
+// in OR-fashion to the list of filters.
+func (filter TripleFilter) OrWithDataProperty(propertyURI string, literal GenericLiteral) TripleFilter {
+	filterTrp := Triple{
+		Subject:   "",
+		Predicate: NewResourceTerm(propertyURI),
+		Object:    literal.Term(),
+	}
+	filter = append(filter, []Triple{filterTrp})
+	return filter
+}
+
+// AndWithDataProperty returns a generic triple filter that returns all
+// individuals that have the given data property. The property filter is appended
+// in AND-fashion to the last filter in the list (if there is any).
+func (filter TripleFilter) AndWithDataProperty(propertyURI string, literal GenericLiteral) TripleFilter {
+	filterTrp := Triple{
+		Subject:   "",
+		Predicate: NewResourceTerm(propertyURI),
+		Object:    literal.Term(),
+	}
+	// Append to last OR filter in the list
+	if len(filter) == 0 {
+		filter = append(filter, []Triple{})
+	}
+	filter[len(filter)-1] = append(filter[len(filter)-1], filterTrp)
+
+	return filter
 }
 
 // *****************
