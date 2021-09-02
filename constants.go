@@ -41,4 +41,5 @@ const (
 	XSDDate     string = "http://www.w3.org/2001/XMLSchema#date"
 	XSDTime     string = "http://www.w3.org/2001/XMLSchema#time"
 	XSDDateTime string = "http://www.w3.org/2001/XMLSchema#dateTime"
+	XSDAnyURI   string = "http://www.w3.org/2001/XMLSchema#anyURI"
 )
