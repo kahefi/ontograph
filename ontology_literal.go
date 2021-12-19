@@ -2,7 +2,9 @@ package ontograph
 
 import (
     "errors"
+    "fmt"
     "strconv"
+    "time"
 )
 
 // GenericLiteral represents a generic literal term (i.e. containing a value and a corresponding datatype).
@@ -78,18 +80,29 @@ func (l XSDIntegerLiteral) Generic() GenericLiteral {
     return *NewGenericLiteral(t)
 }
 
-// ToXSDInteger parses the literal into a xsd:integer literal. If the literal is not of type xsd:integer, an `ErrLiteralTypeMismatch` is returned.
-func (l *GenericLiteral) ToXSDInteger() (XSDIntegerLiteral, error) {
+// ***************
+// * xsd:decimal *
+// ***************
+
+type XSDDecimalLiteral float64
+
+func (l XSDDecimalLiteral) Generic() GenericLiteral {
+    t := NewLiteralTerm(fmt.Sprintf("%f", float64(l)), "", XSDDecimal)
+    return *NewGenericLiteral(t)
+}
+
+// ToXSDDecimalLiteral parses the literal into a xsd:decimal literal. If the literal is not a number, an `ErrLiteralTypeMismatch` is returned.
+func (l *GenericLiteral) ToXSDDecimal() (XSDDecimalLiteral, error) {
     // Check for type mismatch
-    if l.Type().URI != XSDInteger {
+    if l.Type().URI != XSDDecimal {
         return 0, ErrLiteralTypeMismatch
     }
     // Parse literal
-    val, err := strconv.Atoi(l.Value())
+    val, err := strconv.ParseFloat(l.Value(), 64)
     if err != nil {
         return 0, err
     }
-    return XSDIntegerLiteral(val), nil
+    return XSDDecimalLiteral(val), nil
 }
 
 // ***************
@@ -136,4 +149,30 @@ func (l *GenericLiteral) ToXSDAnyURI() (XSDAnyURILiteral, error) {
     }
     // Parse literal
     return XSDAnyURILiteral(l.Value()), nil
+}
+
+// ***************
+// * xsd:dateTime *
+// ***************
+
+type XSDDateTimeLiteral time.Time
+
+func (l XSDDateTimeLiteral) Generic() GenericLiteral {
+    t := NewLiteralTerm(l.Format(time.RFC3339), "", XSDDateTime)
+    return *NewGenericLiteral(t)
+}
+
+// ToXSDDateTime parses the literal into a xsd:dateTime literal. If the literal is not of type xsd:dateTime, an `ErrLiteralTypeMismatch` is returned. The value must be formatted according to the RFC3339 standard.
+func (l *GenericLiteral) ToXSDDateTime() (XSDDateTimeLiteral, error) {
+    var t time.Time
+    // Check for type mismatch
+    if l.Type().URI != XSDDateTime {
+        return t, ErrLiteralTypeMismatch
+    }
+    // Parse literal
+    t, err := time.Parse(time.RFC3339, l.Value())
+    if err != nil {
+        return t, err
+    }
+    return XSDDateTimeLiteral(t), nil
 }
