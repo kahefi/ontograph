@@ -36,6 +36,7 @@ const (
 	XSDString   string = "http://www.w3.org/2001/XMLSchema#string"
 	XSDInteger  string = "http://www.w3.org/2001/XMLSchema#integer"
 	XSDDouble   string = "http://www.w3.org/2001/XMLSchema#double"
+	XSDDecimal  string = "http://www.w3.org/2001/XMLSchema#decimal"
 	XSDFloat    string = "http://www.w3.org/2001/XMLSchema#float"
 	XSDBoolean  string = "http://www.w3.org/2001/XMLSchema#boolean"
 	XSDDate     string = "http://www.w3.org/2001/XMLSchema#date"

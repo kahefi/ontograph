@@ -158,7 +158,7 @@ func (l *GenericLiteral) ToXSDAnyURI() (XSDAnyURILiteral, error) {
 type XSDDateTimeLiteral time.Time
 
 func (l XSDDateTimeLiteral) Generic() GenericLiteral {
-    t := NewLiteralTerm(l.Format(time.RFC3339), "", XSDDateTime)
+    t := NewLiteralTerm(time.Time(l).Format(time.RFC3339), "", XSDDateTime)
     return *NewGenericLiteral(t)
 }
 
@@ -167,12 +167,12 @@ func (l *GenericLiteral) ToXSDDateTime() (XSDDateTimeLiteral, error) {
     var t time.Time
     // Check for type mismatch
     if l.Type().URI != XSDDateTime {
-        return t, ErrLiteralTypeMismatch
+        return XSDDateTimeLiteral(t), ErrLiteralTypeMismatch
     }
     // Parse literal
     t, err := time.Parse(time.RFC3339, l.Value())
     if err != nil {
-        return t, err
+        return XSDDateTimeLiteral(t), err
     }
     return XSDDateTimeLiteral(t), nil
 }
